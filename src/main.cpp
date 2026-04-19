@@ -4,23 +4,21 @@
 #include <unistd.h> 
 #include "scan.hpp"
 
-
-
 int main() {
     
     struct udev* udev = udev_new();
     if (!udev) {
-        std::cerr << "udev başlatılamadı!" << std::endl;
+        std::cerr << "Error: Failed to initialize udev!" << std::endl;
         return 1;
     }
 
-   
+    // Monitor block devices for new partitions
     struct udev_monitor* mon = udev_monitor_new_from_netlink(udev, "udev");
     udev_monitor_filter_add_match_subsystem_devtype(mon, "block", "partition");
     udev_monitor_enable_receiving(mon);
 
-    std::cout << "--- Arch Linux USB Scanner Aktif ---" << std::endl;
-    std::cout << ">>> Cihaz bekleniyor (USB takıldığında algılanacak)..." << std::endl;
+    std::cout << "--- Arch Linux USB Scanner Active ---" << std::endl;
+    std::cout << ">>> Waiting for devices (Plug in a USB to start)..." << std::endl;
 
     while (true) {
         
@@ -28,23 +26,22 @@ int main() {
         if (dev) {
             const char* action = udev_device_get_action(dev);
             
-            
+            // Triggered when a new device is plugged in
             if (action && std::string(action) == "add") {
                 const char* devnode = udev_device_get_devnode(dev);
                 
                 if (devnode) {
-                    std::cout << "\n[!] Disk Bölümü Algılandı: " << devnode << std::endl;
+                    std::cout << "\n[!] Partition Detected: " << devnode << std::endl;
+                    std::cout << "[*] Checking mount point..." << std::endl;
                     
-                   
-                    std::cout << "Mount noktası kontrol ediliyor..." << std::endl;
+                    // Giving the system a few seconds to settle
                     sleep(3); 
 
-                    
                     std::string mountPath = findMountPoint(devnode);
 
-                    
+                    // If not auto-mounted, try manual mount
                     if (mountPath.empty()) {
-                        std::cout << "[*] Cihaz bağlı değil. Manuel bağlama deneniyor..." << std::endl;
+                        std::cout << "[*] Device not mounted. Attempting manual mount..." << std::endl;
                         std::string manualTarget = "/mnt/usb_scanner_target";
                         
                         if (mountDevice(devnode, manualTarget)) {
@@ -52,14 +49,15 @@ int main() {
                         }
                     }
 
-                   
                     if (!mountPath.empty()) {
-                        std::cout << "[+] Tarama Dizini: " << mountPath << std::endl;
+                        std::cout << "[+] Scan Directory: " << mountPath << std::endl;
+                        std::cout << "[>] Starting SHA-256 analysis..." << std::endl;
+                        
+                        // Ensure the function name matches your scan.hpp (startScan or startscan)
                         startscan(mountPath);
                         
-                        
                     } else {
-                        std::cout << "[X] Hata: Cihaz bağlama noktası bulunamadı/oluşturulamadı." << std::endl;
+                        std::cout << "[X] Error: Could not find or create a mount point." << std::endl;
                     }
                 }
             }
